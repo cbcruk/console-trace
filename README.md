@@ -67,6 +67,25 @@ await trace('checkout', async () => {
 })
 ```
 
+## Production transport
+
+In production, skip the overlay and stream span boundaries as wide events
+(`trace_id` / `span_id` / `parent_id`) to your observability backend. Set
+`retain: false` so completed spans are not held by the in-memory tree — events
+flow out but memory does not grow:
+
+```ts
+setupTrace({
+  overlay: false,
+  retain: false,
+  transport(event) {
+    fetch('/v1/events', { method: 'POST', body: JSON.stringify(event) })
+  },
+})
+```
+
+One `WideEvent` is emitted per span on completion, with its logs folded in.
+
 ## Development
 
 ```bash

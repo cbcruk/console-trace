@@ -40,6 +40,7 @@ export type TraceListener = (event: TraceEvent) => void
 export interface TraceConfig {
   enabled: boolean
   projectRoot: string | null
+  retain: boolean
 }
 
 export interface Logger {

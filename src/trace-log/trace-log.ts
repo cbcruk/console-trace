@@ -13,6 +13,7 @@ import { captureSource } from './trace-log.utils.ts'
 const config: TraceConfig = {
   enabled: true,
   projectRoot: null,
+  retain: true,
 }
 
 const listeners = new Set<TraceListener>()
@@ -105,7 +106,10 @@ export function trace<T>(name: string, fn: () => T): T {
     source: captureSource(config.projectRoot),
   }
 
-  parent.children.push(span)
+  if (config.retain) {
+    parent.children.push(span)
+  }
+
   emit({ type: 'span:start', span })
 
   const finish = (status: Span['status']): void => {

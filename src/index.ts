@@ -1,6 +1,8 @@
 import { configure, getRoot, subscribe } from './trace-log/trace-log.ts'
 import type { Span } from './trace-log/trace-log.types.ts'
 import { mountOverlay, replayToConsole } from './trace-overlay/trace-overlay.ts'
+import { installTransport } from './trace-transport/trace-transport.ts'
+import type { Transport } from './trace-transport/trace-transport.types.ts'
 
 declare const __TRACE_PROJECT_ROOT__: string | undefined
 
@@ -9,6 +11,8 @@ export interface SetupTraceOptions {
   projectRoot?: string | null
   overlay?: boolean
   replayOnRootEnd?: boolean
+  retain?: boolean
+  transport?: Transport
 }
 
 function injectedProjectRoot(): string | null {
@@ -20,13 +24,18 @@ export function setupTrace(options: SetupTraceOptions = {}): () => void {
   const projectRoot = options.projectRoot ?? injectedProjectRoot()
   const overlay = options.overlay ?? typeof document !== 'undefined'
   const replayOnRootEnd = options.replayOnRootEnd ?? true
+  const retain = options.retain ?? true
 
-  configure({ enabled, projectRoot })
+  configure({ enabled, projectRoot, retain })
 
   const cleanups: Array<() => void> = []
 
   if (!enabled) {
     return (): void => {}
+  }
+
+  if (options.transport) {
+    cleanups.push(installTransport(options.transport))
   }
 
   if (overlay) {
@@ -65,6 +74,8 @@ export { mountOverlay, replayToConsole } from './trace-overlay/trace-overlay.ts'
 export type { OverlayHandle } from './trace-overlay/trace-overlay.ts'
 export { AsyncContext, asyncContextMode } from './async-context/async-context.ts'
 export { runAsync } from './async-awaiter/async-awaiter.ts'
+export { installTransport, toWideEvent } from './trace-transport/trace-transport.ts'
+export type { Transport, WideEvent, WideEventLog } from './trace-transport/trace-transport.types.ts'
 export { tracePlugin } from './vite-plugin-trace/vite-plugin-trace.ts'
 export type {
   LogEntry,
