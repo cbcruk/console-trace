@@ -41,6 +41,9 @@ setupTrace()
 `vscode://file/...` link. Without the plugin, tracing still works — the links
 are just disabled.
 
+The overlay supports collapsing spans and filtering by log level; both are
+persisted to `localStorage` and restored across reloads.
+
 ### Fallback accuracy across `await`
 
 In `fallback` mode a plain `await` drops the ambient span (see above). Enable

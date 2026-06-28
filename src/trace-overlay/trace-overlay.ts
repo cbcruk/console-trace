@@ -1,9 +1,14 @@
 import { asyncContextMode } from '../async-context/async-context.ts'
 import { getRoot, subscribe } from '../trace-log/trace-log.ts'
 import type { LogEntry, LogLevel, SourceLocation, Span } from '../trace-log/trace-log.types.ts'
+import { LOG_LEVELS, loadState, saveState } from './trace-overlay.storage.ts'
+import type { OverlayHandle, OverlayState } from './trace-overlay.types.ts'
 
-export interface OverlayHandle {
-  unmount(): void
+export type { OverlayHandle } from './trace-overlay.types.ts'
+
+interface RenderContext {
+  state: OverlayState
+  refresh: () => void
 }
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -90,7 +95,7 @@ function renderLog(entry: LogEntry): HTMLElement {
   return row
 }
 
-function renderSpan(span: Span): HTMLElement {
+function renderSpan(span: Span, key: string, ctx: RenderContext): HTMLElement {
   const container = document.createElement('div')
 
   container.setAttribute(
@@ -101,6 +106,21 @@ function renderSpan(span: Span): HTMLElement {
   const header = document.createElement('div')
 
   header.setAttribute('style', 'padding:2px 0;font-size:12px;color:#e6e6e6;')
+
+  const hasChildren = span.children.length > 0 || span.logs.length > 0
+  const collapsed = ctx.state.collapsed[key] === true
+
+  if (hasChildren) {
+    const toggle = document.createElement('span')
+
+    toggle.textContent = collapsed ? '▶' : '▼'
+    toggle.setAttribute('style', 'cursor:pointer;margin-right:4px;color:#9aa0a6;')
+    toggle.addEventListener('click', () => {
+      ctx.state.collapsed[key] = !collapsed
+      ctx.refresh()
+    })
+    header.appendChild(toggle)
+  }
 
   const dot = document.createElement('span')
 
@@ -115,23 +135,68 @@ function renderSpan(span: Span): HTMLElement {
   appendSource(header, span.source)
   container.appendChild(header)
 
-  for (const entry of span.logs) {
-    container.appendChild(renderLog(entry))
+  if (collapsed) {
+    return container
   }
 
-  for (const child of span.children) {
-    container.appendChild(renderSpan(child))
+  for (const entry of span.logs) {
+    if (ctx.state.levels[entry.level]) {
+      container.appendChild(renderLog(entry))
+    }
   }
+
+  renderChildren(container, span.children, key, ctx)
 
   return container
 }
 
-function renderHeader(): HTMLElement {
+function renderChildren(
+  parent: HTMLElement,
+  spans: Span[],
+  parentKey: string,
+  ctx: RenderContext,
+): void {
+  const counts = new Map<string, number>()
+
+  for (const span of spans) {
+    const index = counts.get(span.name) ?? 0
+
+    counts.set(span.name, index + 1)
+    parent.appendChild(renderSpan(span, `${parentKey}/${span.name}#${index}`, ctx))
+  }
+}
+
+function renderLevelFilter(ctx: RenderContext): HTMLElement {
+  const group = document.createElement('div')
+
+  group.setAttribute('style', 'display:flex;gap:4px;')
+
+  for (const level of LOG_LEVELS) {
+    const active = ctx.state.levels[level]
+    const button = document.createElement('span')
+
+    button.textContent = level
+    button.setAttribute(
+      'style',
+      `cursor:pointer;font-size:10px;padding:1px 5px;border-radius:4px;` +
+        `background:${LEVEL_COLORS[level]};color:#000;opacity:${active ? '1' : '0.35'};`,
+    )
+    button.addEventListener('click', () => {
+      ctx.state.levels[level] = !active
+      ctx.refresh()
+    })
+    group.appendChild(button)
+  }
+
+  return group
+}
+
+function renderHeader(ctx: RenderContext): HTMLElement {
   const header = document.createElement('div')
 
   header.setAttribute(
     'style',
-    'display:flex;justify-content:space-between;align-items:center;' +
+    'display:flex;justify-content:space-between;align-items:center;gap:8px;' +
       'padding:6px 8px;border-bottom:1px solid #2a2a2a;font-size:12px;color:#fff;',
   )
 
@@ -139,6 +204,7 @@ function renderHeader(): HTMLElement {
 
   title.textContent = 'trace'
   header.appendChild(title)
+  header.appendChild(renderLevelFilter(ctx))
 
   const badge = document.createElement('span')
 
@@ -188,24 +254,29 @@ export function mountOverlay(): OverlayHandle {
       'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;z-index:2147483647;' +
       'box-shadow:0 8px 24px rgba(0,0,0,0.4);',
   )
-
-  const header = renderHeader()
-  const body = document.createElement('div')
-
-  body.setAttribute('style', 'padding:6px 4px;')
-  panel.appendChild(header)
-  panel.appendChild(body)
   document.body.appendChild(panel)
 
+  const state = loadState()
   let frame = 0
 
-  const render = (): void => {
-    frame = 0
-    body.replaceChildren()
+  const ctx: RenderContext = {
+    state,
+    refresh: (): void => {
+      saveState(state)
+      render()
+    },
+  }
 
-    for (const child of getRoot().children) {
-      body.appendChild(renderSpan(child))
-    }
+  function render(): void {
+    frame = 0
+    panel.replaceChildren()
+    panel.appendChild(renderHeader(ctx))
+
+    const body = document.createElement('div')
+
+    body.setAttribute('style', 'padding:6px 4px;')
+    renderChildren(body, getRoot().children, 'root', ctx)
+    panel.appendChild(body)
   }
 
   const schedule = (): void => {
