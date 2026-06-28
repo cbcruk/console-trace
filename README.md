@@ -41,6 +41,20 @@ setupTrace()
 `vscode://file/...` link. Without the plugin, tracing still works — the links
 are just disabled.
 
+### Fallback accuracy across `await`
+
+In `fallback` mode a plain `await` drops the ambient span (see above). Enable
+the transform to fix it — it downlevels `async` functions to generators driven
+by `runAsync`, so the context is restored on every resume:
+
+```ts
+tracePlugin({ transform: true })
+```
+
+The transform uses Babel, declared as an optional peer dependency — install
+`@babel/core` when you enable it. `for await...of` is rejected with a clear
+error rather than miscompiled. In `native` mode the transform is unnecessary.
+
 ## Usage
 
 ```ts
