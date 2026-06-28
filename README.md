@@ -17,9 +17,13 @@ trace-overlay   live tree + vscode:// links, console.group replay
 index           setupTrace, public API        vite-plugin-trace   injects projectRoot for source links
 ```
 
-The tree **structure** is fixed synchronously at `trace()` call time, so it is
-correct in any mode. Only ambient `log()` attribution depends on context
-propagation: `native` when `AsyncContext` exists, `fallback` otherwise.
+Each parent/child edge is recorded synchronously when `trace()` is called, so
+**synchronous** nesting is always correct and no spans are lost. Attribution
+across an `await` — both ambient `log()` and a `trace()` that runs after the
+await — depends on context propagation: exact in `native` mode (real
+`AsyncContext`), but in `fallback` mode a plain `await` drops the context and
+such calls attach to the root. Use `runAsync` (see `async-awaiter`) to keep the
+fallback accurate across await.
 
 ## Setup
 

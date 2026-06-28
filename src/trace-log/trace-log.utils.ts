@@ -10,13 +10,13 @@ const INTERNAL_MARKERS = [
 
 const FRAME_PATTERN = /(?:\(|@|\s)((?:[a-z]+:\/\/|\/)[^\s()]+?):(\d+):(\d+)\)?$/i
 
-interface ParsedFrame {
+export interface ParsedFrame {
   url: string
   line: number
   column: number
 }
 
-function parseFrame(frame: string): ParsedFrame | null {
+export function parseFrame(frame: string): ParsedFrame | null {
   const match = FRAME_PATTERN.exec(frame.trim())
 
   if (!match) {
@@ -30,11 +30,11 @@ function parseFrame(frame: string): ParsedFrame | null {
   }
 }
 
-function isInternal(url: string): boolean {
+export function isInternal(url: string): boolean {
   return INTERNAL_MARKERS.some((marker) => url.includes(marker))
 }
 
-function toPathname(url: string): string {
+export function toPathname(url: string): string {
   const schemeIndex = url.indexOf('://')
 
   if (schemeIndex === -1) {
@@ -49,7 +49,7 @@ function toPathname(url: string): string {
   return query === -1 ? pathname : pathname.slice(0, query)
 }
 
-function toHref(
+export function toHref(
   pathname: string,
   line: number,
   column: number,
