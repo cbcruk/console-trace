@@ -1,0 +1,232 @@
+import { asyncContextMode } from '../async-context/async-context.ts'
+import { getRoot, subscribe } from '../trace-log/trace-log.ts'
+import type { LogEntry, LogLevel, SourceLocation, Span } from '../trace-log/trace-log.types.ts'
+
+export interface OverlayHandle {
+  unmount(): void
+}
+
+const LEVEL_COLORS: Record<LogLevel, string> = {
+  debug: '#8a8a8a',
+  info: '#4aa3ff',
+  warn: '#e6a700',
+  error: '#ff5c5c',
+}
+
+const STATUS_COLORS: Record<Span['status'], string> = {
+  running: '#9aa0a6',
+  ok: '#3fb950',
+  error: '#ff5c5c',
+}
+
+function isBrowser(): boolean {
+  return typeof document !== 'undefined'
+}
+
+function formatArg(value: unknown): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (value instanceof Error) {
+    return value.stack ?? value.message
+  }
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function formatArgs(args: unknown[]): string {
+  return args.map(formatArg).join(' ')
+}
+
+function formatDuration(span: Span): string {
+  if (span.endTime === null) {
+    return '…'
+  }
+
+  return `${(span.endTime - span.startTime).toFixed(1)}ms`
+}
+
+function appendSource(parent: HTMLElement, source: SourceLocation | null): void {
+  if (!source) {
+    return
+  }
+
+  const style = 'margin-left:6px;font-size:10px;color:#7a7a7a;text-decoration:none;'
+
+  if (source.href) {
+    const link = document.createElement('a')
+
+    link.href = source.href
+    link.textContent = `${source.label} ↗`
+    link.setAttribute('style', style)
+    parent.appendChild(link)
+    return
+  }
+
+  const span = document.createElement('span')
+
+  span.textContent = source.label
+  span.setAttribute('style', style)
+  span.title = 'Add tracePlugin() to enable jump-to-source links'
+  parent.appendChild(span)
+}
+
+function renderLog(entry: LogEntry): HTMLElement {
+  const row = document.createElement('div')
+
+  row.setAttribute('style', `padding:1px 0;color:${LEVEL_COLORS[entry.level]};font-size:11px;`)
+
+  const text = document.createElement('span')
+
+  text.textContent = `${entry.level} ${formatArgs(entry.args)}`
+  row.appendChild(text)
+  appendSource(row, entry.source)
+
+  return row
+}
+
+function renderSpan(span: Span): HTMLElement {
+  const container = document.createElement('div')
+
+  container.setAttribute(
+    'style',
+    'margin-left:12px;border-left:1px solid #2a2a2a;padding-left:8px;',
+  )
+
+  const header = document.createElement('div')
+
+  header.setAttribute('style', 'padding:2px 0;font-size:12px;color:#e6e6e6;')
+
+  const dot = document.createElement('span')
+
+  dot.textContent = '●'
+  dot.setAttribute('style', `color:${STATUS_COLORS[span.status]};margin-right:6px;`)
+  header.appendChild(dot)
+
+  const name = document.createElement('span')
+
+  name.textContent = `${span.name} (${formatDuration(span)})`
+  header.appendChild(name)
+  appendSource(header, span.source)
+  container.appendChild(header)
+
+  for (const entry of span.logs) {
+    container.appendChild(renderLog(entry))
+  }
+
+  for (const child of span.children) {
+    container.appendChild(renderSpan(child))
+  }
+
+  return container
+}
+
+function renderHeader(): HTMLElement {
+  const header = document.createElement('div')
+
+  header.setAttribute(
+    'style',
+    'display:flex;justify-content:space-between;align-items:center;' +
+      'padding:6px 8px;border-bottom:1px solid #2a2a2a;font-size:12px;color:#fff;',
+  )
+
+  const title = document.createElement('strong')
+
+  title.textContent = 'trace'
+  header.appendChild(title)
+
+  const badge = document.createElement('span')
+
+  badge.textContent = asyncContextMode
+  badge.setAttribute(
+    'style',
+    `font-size:10px;padding:1px 6px;border-radius:4px;color:#fff;background:${
+      asyncContextMode === 'native' ? '#3fb950' : '#e6a700'
+    };`,
+  )
+  header.appendChild(badge)
+
+  return header
+}
+
+export function replayToConsole(root: Span = getRoot()): void {
+  const walk = (span: Span): void => {
+    const label = span.parent === null ? 'trace' : span.name
+
+    console.group(label)
+
+    for (const entry of span.logs) {
+      console[entry.level](...entry.args)
+    }
+
+    for (const child of span.children) {
+      walk(child)
+    }
+
+    console.groupEnd()
+  }
+
+  walk(root)
+}
+
+export function mountOverlay(): OverlayHandle {
+  if (!isBrowser()) {
+    return { unmount: (): void => {} }
+  }
+
+  const panel = document.createElement('div')
+
+  panel.setAttribute(
+    'style',
+    'position:fixed;right:12px;bottom:12px;width:380px;max-height:60vh;' +
+      'overflow:auto;background:#1a1a1a;border:1px solid #333;border-radius:8px;' +
+      'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;z-index:2147483647;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,0.4);',
+  )
+
+  const header = renderHeader()
+  const body = document.createElement('div')
+
+  body.setAttribute('style', 'padding:6px 4px;')
+  panel.appendChild(header)
+  panel.appendChild(body)
+  document.body.appendChild(panel)
+
+  let frame = 0
+
+  const render = (): void => {
+    frame = 0
+    body.replaceChildren()
+
+    for (const child of getRoot().children) {
+      body.appendChild(renderSpan(child))
+    }
+  }
+
+  const schedule = (): void => {
+    if (frame !== 0) {
+      return
+    }
+
+    frame =
+      typeof requestAnimationFrame !== 'undefined'
+        ? requestAnimationFrame(render)
+        : (setTimeout(render, 16) as unknown as number)
+  }
+
+  const unsubscribe = subscribe(schedule)
+
+  render()
+
+  return {
+    unmount: (): void => {
+      unsubscribe()
+      panel.remove()
+    },
+  }
+}
