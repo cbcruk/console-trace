@@ -33,6 +33,15 @@ here so the next session has context.
   geometry next to the collapse/level state in
   [trace-overlay.storage.ts](src/trace-overlay/trace-overlay.storage.ts).
 
+## Devtools
+
+- **Browser-extension devtools panel.** The
+  [devtools-panel example](examples/devtools-panel/) renders a
+  TanStack-Devtools-style UI in-page on the public API. A natural extension is
+  to move it into a real browser devtools panel (a `chrome.devtools`/WebExtension
+  front-end that subscribes to the same span stream), so the trace tree lives in
+  DevTools rather than overlaying the app. Deferred — not committed work.
+
 ## Validation
 
 - Run the engine in a real app to confirm whether the `fallback` mode
