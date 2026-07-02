@@ -42,6 +42,36 @@ here so the next session has context.
   front-end that subscribes to the same span stream), so the trace tree lives in
   DevTools rather than overlaying the app. Deferred — not committed work.
 
+## Node / terminal
+
+The engine (`async-context` / `trace-log` / `trace-transport`) is
+environment-agnostic; only the _presentation_ is browser-shaped today. Split
+the two problems when bringing this to Node:
+
+- **Capture is easier in Node, not harder.** The fallback + Babel transform
+  exist only because the browser has no native `AsyncContext` yet. Node's
+  `AsyncLocalStorage` (`node:async_hooks`, stable) gives the same guarantees
+  across `await`. Add an `AsyncLocalStorage` adapter in
+  [async-context.ts](src/async-context/async-context.ts) (`run`→`als.run`,
+  `get`→`als.getStore`, `Snapshot`→`als.snapshot()`), so Node runs in `native`
+  mode and needs **no transform**. `resolveNative()` only checks
+  `globalThis.AsyncContext` today.
+- **In Node the answer is a data format, not a UI.** Lean on the existing
+  `WideEvent` (already OpenTelemetry-shaped: `trace_id` / `span_id` /
+  `parent_id`). Ship a pretty-printing **console exporter** and an **OTLP
+  adapter** so traces flow into the terminal / Jaeger / Tempo / Honeycomb
+  instead of rebuilding an overlay.
+- **Batch tree printer (dev, low-cost, high-value).** Grow
+  [`replayToConsole`](src/trace-overlay/trace-overlay.ts) into the terminal
+  analog of the overlay: box-drawing (`├─ └─`), ANSI colors for status/level,
+  per-span timings, and **OSC 8 hyperlinks** so the `vscode://` jump-to-source
+  survives in terminals that support it (iTerm2, WezTerm, the VS Code
+  integrated terminal). Write to `stderr` to avoid fighting app `stdout`.
+- **Live TUI (deferred, high-cost).** A real in-terminal live tree
+  (alternate-screen buffer + cursor control, or Ink / listr2) is possible but
+  the least necessary — the console exporter + batch printer cover most needs,
+  and it has to manage stdout contention. Revisit only on demand.
+
 ## Validation
 
 - Run the engine in a real app to confirm whether the `fallback` mode
