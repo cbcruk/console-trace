@@ -6,16 +6,42 @@ a live overlay (with jump-to-source links) plus a `console.group` replay.
 
 ## How it fits together
 
+```mermaid
+graph TD
+    subgraph runtime["Runtime"]
+        index["<b>index</b><br/>setupTrace · public API"]
+        overlay["<b>trace-overlay</b><br/>live tree · vscode:// links<br/>console.group replay"]
+        transport["<b>trace-transport</b><br/>wide events for production"]
+        log["<b>trace-log</b><br/>engine: trace / log / logger<br/>+ source capture"]
+        awaiter["<b>async-awaiter</b><br/>runAsync — keeps fallback<br/>accurate across await"]
+        context["<b>async-context</b><br/>Variable / Snapshot<br/>native AsyncContext → fallback"]
+    end
+
+    subgraph build["Build-time · Vite plugin"]
+        plugin["<b>vite-plugin-trace</b><br/>injects projectRoot"]
+        transform["<b>transform</b><br/>async → runAsync (Babel)"]
+    end
+
+    index --> overlay
+    index --> transport
+    overlay --> log
+    transport --> log
+    log --> context
+    awaiter --> context
+    plugin --> transform
+    plugin -. "injects runAsync + projectRoot" .-> awaiter
+
+    classDef core fill:#1f6feb22,stroke:#1f6feb,color:#c9d1d9;
+    classDef tool fill:#8957e522,stroke:#8957e5,color:#c9d1d9;
+    class index,overlay,transport,log,awaiter,context core;
+    class plugin,transform tool;
 ```
-async-context   core: Variable / Snapshot, delegates to native AsyncContext or falls back to userland
-      ↑
-async-awaiter   runAsync — keeps the fallback accurate across await when async is downleveled to generators
-trace-log       engine: trace / log / logger + source capture
-      ↑
-trace-overlay   live tree + vscode:// links, console.group replay
-      ↑
-index           setupTrace, public API        vite-plugin-trace   injects projectRoot for source links
-```
+
+Arrows point from a module to what it depends on: `async-context` is the
+foundation, `trace-log` is the engine built on it, and `index` is the public
+API on top. The Vite plugin is a separate build-time concern that feeds
+`projectRoot` (for source links) and the `runAsync` import (for the async
+transform) back into the runtime.
 
 Each parent/child edge is recorded synchronously when `trace()` is called, so
 **synchronous** nesting is always correct and no spans are lost. Attribution
