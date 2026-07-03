@@ -84,6 +84,12 @@ The transform uses Babel, declared as an optional peer dependency — install
 `@babel/core` when you enable it. `for await...of` is rejected with a clear
 error rather than miscompiled. In `native` mode the transform is unnecessary.
 
+> **New to `AsyncContext`?** Step through why synchronous nesting is always
+> exact, why a plain `await` leaks the span in `fallback` mode, and how
+> `Snapshot` + `runAsync` restore it — one execution step at a time — in the
+> interactive explainer: [docs/async-context.html](docs/async-context.html)
+> (open it in a browser).
+
 ## Usage
 
 ```ts
