@@ -1,5 +1,9 @@
 import type { NodePath, PluginObject, PluginPass, types as BabelTypes } from '@babel/core'
 
+/**
+ * Local identifier the transform binds `runAsync` to in each rewritten module.
+ * Prefixed to avoid colliding with user code.
+ */
 export const HELPER_NAME = '__runAsync'
 
 interface TransformResult {
@@ -11,6 +15,20 @@ interface BabelApi {
   types: typeof BabelTypes
 }
 
+/**
+ * Babel plugin that downlevels `async` functions to generators driven by
+ * `runAsync`, so the ambient span survives `await` in `fallback` mode.
+ *
+ * Each `async` function becomes a plain function returning
+ * `__runAsync(this, arguments, void 0, function* () { ... })`, with its
+ * `await` expressions rewritten to `yield`. Nested functions are skipped and
+ * handled by their own visit, so each `await` binds to the right body. Async
+ * generators are left alone; `for await...of` throws a code-frame error rather
+ * than being miscompiled.
+ *
+ * Sets `traceTransformed` on the file metadata when it changed anything, so
+ * callers can skip untouched modules.
+ */
 export function asyncToRunAsyncPlugin({ types }: BabelApi): PluginObject {
   const voidZero = (): BabelTypes.UnaryExpression =>
     types.unaryExpression('void', types.numericLiteral(0))
@@ -79,6 +97,18 @@ export function asyncToRunAsyncPlugin({ types }: BabelApi): PluginObject {
   }
 }
 
+/**
+ * Runs {@link asyncToRunAsyncPlugin} over a module.
+ *
+ * Babel is imported lazily and declared as an optional peer dependency, so it
+ * is only required when the transform is actually enabled. Project Babel
+ * config is ignored — TypeScript and JSX are parsed, nothing else is applied.
+ *
+ * Source maps are not generated yet, so positions point at transformed code.
+ *
+ * @returns The emitted code plus whether any `async` function was rewritten,
+ * or `null` if Babel produced no output.
+ */
 export async function transformAsync(
   code: string,
   filename: string,

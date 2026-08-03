@@ -6,12 +6,34 @@ import type { Transport } from './trace-transport/trace-transport.types.ts'
 
 declare const __TRACE_PROJECT_ROOT__: string | undefined
 
+/** Options for {@link setupTrace}. Every field has a default. */
 export interface SetupTraceOptions {
+  /**
+   * Master switch. When `false`, `trace()` calls through to its callback,
+   * `log()` is dropped, and nothing is installed. Default `true`.
+   */
   enabled?: boolean
+  /**
+   * Absolute root used to build `vscode://file/...` source links. Defaults to
+   * the value `tracePlugin()` injects at build time, or `null` without the
+   * plugin, which disables the links.
+   */
   projectRoot?: string | null
+  /** Mount the live overlay. Defaults to `true` in the browser. */
   overlay?: boolean
+  /**
+   * Replay each completed top-level span through `console.group`.
+   * Default `true`.
+   */
   replayOnRootEnd?: boolean
+  /**
+   * Keep completed spans on the in-memory tree. Set `false` in production so
+   * events still reach `transport` while memory stays flat — at the cost of
+   * an empty overlay and a replay that stops at each top-level span.
+   * Default `true`.
+   */
   retain?: boolean
+  /** Receives one `WideEvent` per completed span. */
   transport?: Transport
 }
 
@@ -19,6 +41,28 @@ function injectedProjectRoot(): string | null {
   return typeof __TRACE_PROJECT_ROOT__ !== 'undefined' ? __TRACE_PROJECT_ROOT__ : null
 }
 
+/**
+ * Configures tracing and installs the optional overlay, transport, and console
+ * replay. Call once at app startup, before the code you want traced runs.
+ *
+ * Options:
+ * - `enabled` — master switch. When `false`, `trace()` calls through to its
+ *   callback, `log()` is dropped, and nothing is installed. Default `true`.
+ * - `projectRoot` — absolute root used to build `vscode://file/...` source
+ *   links. Defaults to the value `tracePlugin()` injects at build time, or
+ *   `null` without the plugin, which disables the links.
+ * - `overlay` — mount the live overlay. Defaults to `true` in the browser.
+ * - `replayOnRootEnd` — replay each completed top-level span through
+ *   `console.group`. Default `true`.
+ * - `retain` — keep completed spans on the in-memory tree. Set `false` in
+ *   production so events still reach `transport` while memory stays flat.
+ *   Note the overlay renders that tree, so it stays empty without it, and the
+ *   console replay loses everything below each top-level span. Default `true`.
+ * - `transport` — receives one `WideEvent` per completed span.
+ *
+ * @returns A cleanup function that unmounts the overlay and removes every
+ * listener this call installed. Config changes are not reverted.
+ */
 export function setupTrace(options: SetupTraceOptions = {}): () => void {
   const enabled = options.enabled ?? true
   const projectRoot = options.projectRoot ?? injectedProjectRoot()

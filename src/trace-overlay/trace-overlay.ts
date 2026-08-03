@@ -220,6 +220,16 @@ function renderHeader(ctx: RenderContext): HTMLElement {
   return header
 }
 
+/**
+ * Replays a span tree through nested `console.group` calls, so a completed
+ * trace can be read in the browser console or a terminal.
+ *
+ * Each log is emitted with its original arguments through the matching
+ * `console` method, keeping objects inspectable. `setupTrace` calls this for
+ * every top-level span that ends unless `replayOnRootEnd` is disabled.
+ *
+ * @param root - Span to replay; defaults to the current root.
+ */
 export function replayToConsole(root: Span = getRoot()): void {
   const walk = (span: Span): void => {
     const label = span.parent === null ? 'trace' : span.name
@@ -240,6 +250,16 @@ export function replayToConsole(root: Span = getRoot()): void {
   walk(root)
 }
 
+/**
+ * Mounts the live overlay: a fixed panel rendering the span tree with status,
+ * timings, and jump-to-source links.
+ *
+ * Re-renders are batched into an animation frame as events arrive. Collapse
+ * state and level filters persist to `localStorage` and are restored on the
+ * next mount. Outside a browser this is a no-op returning an inert handle.
+ *
+ * @returns A handle whose `unmount()` removes the panel and its subscription.
+ */
 export function mountOverlay(): OverlayHandle {
   if (!isBrowser()) {
     return { unmount: (): void => {} }

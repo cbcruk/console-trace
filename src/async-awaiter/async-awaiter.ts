@@ -2,6 +2,24 @@ import { AsyncContext } from '../async-context/async-context.ts'
 
 type GeneratorFactory = () => Generator<unknown, unknown, unknown>
 
+/**
+ * Drives a downleveled `async` function, re-installing the ambient context on
+ * every resume.
+ *
+ * The trace transform rewrites `async`/`await` into a generator that `yield`s
+ * awaited values and hands it to this helper. An `AsyncContext.Snapshot` is
+ * captured when the function starts and replayed before each `next`/`throw`,
+ * so `trace()`/`log()` calls after an `await` still see the span that was
+ * active when the function began — the accuracy a plain `await` loses in
+ * `fallback` mode.
+ *
+ * @param thisArg - `this` binding for the generator body.
+ * @param args - The original function's `arguments`, forwarded to the body.
+ * @param promiseCtor - Promise constructor for the result; defaults to `Promise`.
+ * @param factory - Generator function emitted by the transform.
+ * @returns A promise settling with the generator's return value, or rejecting
+ * with the first error it throws.
+ */
 export function runAsync<T>(
   thisArg: unknown,
   args: ArrayLike<unknown>,

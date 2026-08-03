@@ -61,6 +61,17 @@ function toWideLogs(span: Span): WideEventLog[] {
   }))
 }
 
+/**
+ * Flattens a span into a single wide event, folding its logs in as messages.
+ *
+ * Trace and span ids are assigned lazily and cached per span, so repeated
+ * calls are stable. Every span under one top-level call shares a `trace_id`;
+ * `parent_id` is `null` for that top-level span, since the synthetic root is
+ * not itself an event.
+ *
+ * Log arguments are stringified here — the event is a wire payload, not a live
+ * view of the tree.
+ */
 export function toWideEvent(span: Span): WideEvent {
   const { traceId, spanId } = idsFor(span)
   const parent = span.parent
@@ -78,6 +89,16 @@ export function toWideEvent(span: Span): WideEvent {
   }
 }
 
+/**
+ * Streams completed spans to `transport`, one {@link toWideEvent} per span.
+ *
+ * Events fire as each span ends, so a long-running parent is delivered after
+ * its children. Delivery is unbatched and unsampled — wrap `transport` if you
+ * need buffering or head-based sampling. Pair with `retain: false` in
+ * production so events flow out without the tree growing.
+ *
+ * @returns A function that stops the stream.
+ */
 export function installTransport(transport: Transport): () => void {
   return subscribe((event) => {
     if (event.type === 'span:end') {

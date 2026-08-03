@@ -12,6 +12,27 @@ function shouldTransform(id: string): boolean {
   return TRANSFORMABLE.test(id) && !id.includes('node_modules')
 }
 
+/**
+ * Vite plugin that wires console-trace into the build.
+ *
+ * It always defines `__TRACE_PROJECT_ROOT__`, which `setupTrace` reads to turn
+ * captured stack positions into `vscode://file/...` links. Tracing works
+ * without the plugin — the links are simply disabled.
+ *
+ * Options:
+ * - `projectRoot` — root used for source links. Defaults to Vite's `root`,
+ *   falling back to the current working directory.
+ * - `transform` — downlevel `async` functions onto `runAsync` so the ambient
+ *   span survives `await` in `fallback` mode. Requires `@babel/core`, an
+ *   optional peer dependency. Unnecessary in `native` mode. Default `false`.
+ * - `importSource` — module the injected `runAsync` import resolves to.
+ *   Default `'console-trace'`; point it elsewhere when consuming the library
+ *   through an alias or from source.
+ *
+ * Only project `.js`/`.jsx`/`.ts`/`.tsx` files are transformed; dependencies
+ * and modules that never mention `async` are skipped, as are files where no
+ * `async` function was actually rewritten.
+ */
 export function tracePlugin(options: TracePluginOptions = {}): TracePlugin {
   const transformEnabled = options.transform ?? false
   const importSource = options.importSource ?? 'console-trace'

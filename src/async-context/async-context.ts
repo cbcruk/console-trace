@@ -74,6 +74,22 @@ function resolveNative(): AsyncContextLike | null {
 
 const native = resolveNative()
 
+/**
+ * The `AsyncContext` implementation in use: the runtime's native global when
+ * it exposes one, otherwise a userland fallback backed by a module-level map.
+ *
+ * The fallback installs its mapping before calling `Variable.run`'s callback
+ * and restores it in a `finally`, so synchronous nesting is exact. A plain
+ * `await` returns control before the continuation runs, so the restore happens
+ * too early and the value is lost — see `runAsync` for the workaround.
+ */
 export const AsyncContext: AsyncContextLike = native ?? fallback
 
+/**
+ * Which implementation {@link AsyncContext} resolved to.
+ *
+ * `native` propagates across `await` exactly. `fallback` only does so when
+ * async functions are downleveled onto `runAsync` by the trace transform;
+ * without it, calls after an `await` see no ambient value.
+ */
 export const asyncContextMode: AsyncContextMode = native ? 'native' : 'fallback'
