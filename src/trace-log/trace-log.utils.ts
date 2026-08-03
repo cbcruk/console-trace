@@ -10,9 +10,13 @@ const INTERNAL_MARKERS = [
 
 const FRAME_PATTERN = /(?:\(|@|\s)((?:[a-z]+:\/\/|\/)[^\s()]+?):(\d+):(\d+)\)?$/i
 
+/** One stack frame's location, before it is resolved to a {@link SourceLocation}. */
 export interface ParsedFrame {
+  /** Module URL exactly as the engine reported it, scheme and query included. */
   url: string
+  /** 1-based line number. */
   line: number
+  /** 1-based column number. */
   column: number
 }
 
