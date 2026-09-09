@@ -3,6 +3,7 @@ import type {
   LogEntry,
   Logger,
   LogLevel,
+  SourceLocation,
   Span,
   TraceConfig,
   TraceEvent,
@@ -14,6 +15,7 @@ const config: TraceConfig = {
   enabled: true,
   projectRoot: null,
   retain: true,
+  captureSource: true,
 }
 
 const listeners = new Set<TraceListener>()
@@ -51,6 +53,10 @@ const currentSpan = new AsyncContext.Variable<Span>({
 
 function activeSpan(): Span {
   return currentSpan.get() ?? rootSpan
+}
+
+function sourceForCall(): SourceLocation | null {
+  return config.captureSource ? captureSource(config.projectRoot) : null
 }
 
 function emit(event: TraceEvent): void {
@@ -101,6 +107,18 @@ export function getRoot(): Span {
 }
 
 /**
+ * Returns the span `trace()` and `log()` would currently attach to.
+ *
+ * Outside any `trace()` this is the synthetic root, so a caller wanting to
+ * know whether real work is in flight should check `parent !== null`. Reading
+ * it does not affect propagation, which makes it the entry point for anything
+ * that wants to stamp the ambient span onto its own records.
+ */
+export function getActiveSpan(): Span {
+  return activeSpan()
+}
+
+/**
  * Replaces the root with a fresh, empty span, dropping the retained tree.
  *
  * Listeners stay subscribed and spans already in flight still complete, but
@@ -147,7 +165,7 @@ export function trace<T>(name: string, fn: () => T): T {
     startTime: now(),
     endTime: null,
     status: 'running',
-    source: captureSource(config.projectRoot),
+    source: sourceForCall(),
   }
 
   if (config.retain) {
@@ -207,7 +225,7 @@ export function log(level: LogLevel, ...args: unknown[]): void {
     level,
     args,
     time: now(),
-    source: captureSource(config.projectRoot),
+    source: sourceForCall(),
   }
 
   span.logs.push(entry)

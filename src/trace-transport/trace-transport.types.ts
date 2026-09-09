@@ -10,12 +10,12 @@ export interface WideEventLog {
 }
 
 /**
- * One completed span, flattened into a single event with its logs folded in.
+ * The correlation ids identifying one span and its place in a trace.
  *
- * Field names follow the OpenTelemetry span shape, so events map onto common
- * observability backends without translation.
+ * Field names follow the OpenTelemetry span shape, so they map onto common
+ * observability backends, and onto other recorders, without translation.
  */
-export interface WideEvent {
+export interface SpanIdFields {
   /** Shared by every span under one top-level `trace()` call. */
   trace_id: string
   /** Unique to this span. */
@@ -25,6 +25,12 @@ export interface WideEvent {
    * root is not itself an event, so it never appears as a parent.
    */
   parent_id: string | null
+}
+
+/**
+ * One completed span, flattened into a single event with its logs folded in.
+ */
+export interface WideEvent extends SpanIdFields {
   /** Span name, as passed to `trace()`. */
   name: string
   status: SpanStatus

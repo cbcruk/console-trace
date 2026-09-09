@@ -1,6 +1,6 @@
 import { subscribe } from '../trace-log/trace-log.ts'
 import type { Span } from '../trace-log/trace-log.types.ts'
-import type { Transport, WideEvent, WideEventLog } from './trace-transport.types.ts'
+import type { SpanIdFields, Transport, WideEvent, WideEventLog } from './trace-transport.types.ts'
 
 interface SpanIds {
   traceId: string
@@ -62,25 +62,43 @@ function toWideLogs(span: Span): WideEventLog[] {
 }
 
 /**
+ * Returns the correlation ids for a span, in the shape a wide event carries
+ * them.
+ *
+ * Ids are assigned lazily and cached per span, so repeated calls are stable
+ * and an id read while a span is still running matches the one its completed
+ * event carries. Every span under one top-level `trace()` shares a `trace_id`;
+ * `parent_id` is `null` for that top-level span.
+ *
+ * Counters are per document, so ids collide across tabs and reloads. Pair them
+ * with a session identifier before comparing records from more than one run.
+ *
+ * The synthetic root is not a span anything reports on, so passing it in is
+ * not meaningful.
+ */
+export function getSpanIds(span: Span): SpanIdFields {
+  const { traceId, spanId } = idsFor(span)
+  const parent = span.parent
+
+  return {
+    trace_id: traceId,
+    span_id: spanId,
+    parent_id: !parent || isRoot(parent) ? null : idsFor(parent).spanId,
+  }
+}
+
+/**
  * Flattens a span into a single wide event, folding its logs in as messages.
  *
- * Trace and span ids are assigned lazily and cached per span, so repeated
- * calls are stable. Every span under one top-level call shares a `trace_id`;
- * `parent_id` is `null` for that top-level span, since the synthetic root is
- * not itself an event.
+ * Ids come from {@link getSpanIds}, so an event's correlation fields match
+ * anything already stamped from the same span while it was running.
  *
  * Log arguments are stringified here — the event is a wire payload, not a live
  * view of the tree.
  */
 export function toWideEvent(span: Span): WideEvent {
-  const { traceId, spanId } = idsFor(span)
-  const parent = span.parent
-  const parentId = !parent || isRoot(parent) ? null : idsFor(parent).spanId
-
   return {
-    trace_id: traceId,
-    span_id: spanId,
-    parent_id: parentId,
+    ...getSpanIds(span),
     name: span.name,
     status: span.status,
     start: span.startTime,
