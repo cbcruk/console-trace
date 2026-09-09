@@ -55,6 +55,19 @@ await — depends on context propagation: exact in `native` mode (real
 such calls attach to the root. Use `runAsync` (see `async-awaiter`) to keep the
 fallback accurate across await.
 
+## Install
+
+Not on npm — the name is taken by an unrelated package. Install from the
+repository, which builds on install:
+
+```bash
+pnpm add github:cbcruk/console-trace
+```
+
+A lockfile pins the resolved commit, so `--frozen-lockfile` installs stay
+reproducible. Building on install needs the package's own dev dependencies, so
+the first install is slower than a registry one.
+
 ## Setup
 
 ```ts

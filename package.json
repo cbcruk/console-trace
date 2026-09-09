@@ -1,21 +1,34 @@
 {
   "name": "console-trace",
-  "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
+  "version": "0.1.0",
+  "description": "Async-aware tracing for the browser. Builds a span tree that survives module boundaries and await, with no context argument threading, and renders it as a live overlay plus a console.group replay.",
+  "keywords": [
+    "async-context",
+    "asynccontext",
+    "browser",
+    "debugging",
+    "devtools",
+    "logging",
+    "observability",
+    "tracing"
+  ],
+  "homepage": "https://github.com/cbcruk/console-trace#readme",
   "bugs": {
-    "url": "https://github.com/author/library/issues"
+    "url": "https://github.com/cbcruk/console-trace/issues"
   },
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
+  "author": "cbcruk (https://github.com/cbcruk)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/author/library.git"
+    "url": "git+https://github.com/cbcruk/console-trace.git"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
     "./vite-plugin-trace": "./dist/vite-plugin-trace.mjs",
@@ -30,7 +43,7 @@
     "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build",
-    "prepare": "vp config"
+    "prepare": "vp config && vp pack"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
