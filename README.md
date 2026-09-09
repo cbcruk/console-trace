@@ -1,3 +1,8 @@
+> **Moved.** This project now lives in
+> [cbcruk/cdr](https://github.com/cbcruk/cdr) as `packages/console-trace`,
+> where it is an internal workspace package rather than something to install.
+> This repository is archived and kept for its history.
+
 # console-trace
 
 Async-aware tracing for the browser. `trace()` builds a span tree that survives
