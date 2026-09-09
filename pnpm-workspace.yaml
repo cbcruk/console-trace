@@ -1,3 +1,10 @@
+# Declared so this file is a valid workspace manifest for pnpm 9, which
+# requires `packages` and rejects it empty. A consumer installing this package
+# from git runs its own pnpm inside the extracted tarball, so without this the
+# install fails for anyone on pnpm 9 even though pnpm 10+ tolerates the file.
+packages:
+  - '.'
+
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest
