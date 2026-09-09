@@ -88,9 +88,10 @@ export function setupTrace(options: SetupTraceOptions = {}): () => void {
   }
 
   if (replayOnRootEnd) {
-    const root = getRoot()
     const unsubscribe = subscribe((event) => {
-      if (event.type === 'span:end' && event.span.parent === root) {
+      // Resolved per event, not captured once: `resetTrace()` swaps the root
+      // object, and a captured one would stop matching and silently end replay.
+      if (event.type === 'span:end' && event.span.parent === getRoot()) {
         replayToConsole(event.span)
       }
     })
