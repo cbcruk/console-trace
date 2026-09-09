@@ -12,6 +12,7 @@ graph TD
         index["<b>index</b><br/>setupTrace · public API"]
         overlay["<b>trace-overlay</b><br/>live tree · vscode:// links<br/>console.group replay"]
         transport["<b>trace-transport</b><br/>wide events for production"]
+        spanctx["<b>trace-context</b><br/>spanContext — ids for<br/>records kept elsewhere"]
         log["<b>trace-log</b><br/>engine: trace / log / logger<br/>+ source capture"]
         awaiter["<b>async-awaiter</b><br/>runAsync — keeps fallback<br/>accurate across await"]
         context["<b>async-context</b><br/>Variable / Snapshot<br/>native AsyncContext → fallback"]
@@ -24,8 +25,11 @@ graph TD
 
     index --> overlay
     index --> transport
+    index --> spanctx
     overlay --> log
     transport --> log
+    spanctx --> log
+    spanctx --> transport
     log --> context
     awaiter --> context
     plugin --> transform
@@ -33,7 +37,7 @@ graph TD
 
     classDef core fill:#1f6feb22,stroke:#1f6feb,color:#c9d1d9;
     classDef tool fill:#8957e522,stroke:#8957e5,color:#c9d1d9;
-    class index,overlay,transport,log,awaiter,context core;
+    class index,overlay,transport,spanctx,log,awaiter,context core;
     class plugin,transform tool;
 ```
 
@@ -102,6 +106,37 @@ await trace('checkout', async () => {
 })
 ```
 
+## Stamping records kept elsewhere
+
+The span tree is one consumer of the ambient span. Another is any recorder that
+keeps its own records and wants to say which operation each one belongs to.
+`spanContext()` returns the active span as flat correlation fields, ready to
+merge into whatever per-record hook that recorder offers:
+
+```ts
+import { spanContext, trace } from 'console-trace'
+
+const recorder = new Recorder({ enrich: spanContext })
+
+trace('checkout.submit', () => {
+  recorder.warn('validation blocked') // carries trace_id / span_id / parent_id
+})
+```
+
+This is the point of an ambient span expressed as data. The recorder sits deep
+in a call stack and never receives the operation as an argument, yet its records
+come out grouped by it.
+
+Outside any `trace()` the result is empty and spreads to nothing, which also
+covers tracing being disabled. Absent ids mean the record was unattributed,
+never that it was unrelated — a record written from a timer or a later event
+dispatch lands on the root in `fallback` mode, so it carries no ids rather than
+the wrong ones. `trace_mode` travels with the ids so a reader knows how far to
+trust the grouping.
+
+The ids are counters scoped to one document, so pair them with a session
+identifier before comparing records from more than one run.
+
 ## Production transport
 
 In production, skip the overlay and stream span boundaries as wide events
@@ -113,6 +148,7 @@ flow out but memory does not grow:
 setupTrace({
   overlay: false,
   retain: false,
+  captureSource: false,
   transport(event) {
     fetch('/v1/events', { method: 'POST', body: JSON.stringify(event) })
   },
@@ -120,6 +156,9 @@ setupTrace({
 ```
 
 One `WideEvent` is emitted per span on completion, with its logs folded in.
+`captureSource: false` skips the stack trace each `trace()` and `log()` would
+otherwise build for its jump-to-source link, which is the most expensive part
+of recording a span and buys nothing where the links are not shown.
 
 ## Development
 

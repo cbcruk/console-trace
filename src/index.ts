@@ -33,6 +33,12 @@ export interface SetupTraceOptions {
    * Default `true`.
    */
   retain?: boolean
+  /**
+   * Resolve a source location for every `trace()` and `log()` call. Each one
+   * builds a stack trace, so turn it off where the links are not shown anyway.
+   * Default `true`.
+   */
+  captureSource?: boolean
   /** Receives one `WideEvent` per completed span. */
   transport?: Transport
 }
@@ -58,6 +64,9 @@ function injectedProjectRoot(): string | null {
  *   production so events still reach `transport` while memory stays flat.
  *   Note the overlay renders that tree, so it stays empty without it, and the
  *   console replay loses everything below each top-level span. Default `true`.
+ * - `captureSource` — resolve a source location for every call. Each one
+ *   builds a stack trace, so turn it off where the links are not shown
+ *   anyway. Default `true`.
  * - `transport` — receives one `WideEvent` per completed span.
  *
  * @returns A cleanup function that unmounts the overlay and removes every
@@ -69,8 +78,9 @@ export function setupTrace(options: SetupTraceOptions = {}): () => void {
   const overlay = options.overlay ?? typeof document !== 'undefined'
   const replayOnRootEnd = options.replayOnRootEnd ?? true
   const retain = options.retain ?? true
+  const captureSource = options.captureSource ?? true
 
-  configure({ enabled, projectRoot, retain })
+  configure({ enabled, projectRoot, retain, captureSource })
 
   const cleanups: Array<() => void> = []
 
@@ -107,6 +117,7 @@ export function setupTrace(options: SetupTraceOptions = {}): () => void {
 
 export {
   configure,
+  getActiveSpan,
   getConfig,
   getRoot,
   log,
@@ -119,8 +130,15 @@ export { mountOverlay, replayToConsole } from './trace-overlay/trace-overlay.ts'
 export type { OverlayHandle } from './trace-overlay/trace-overlay.ts'
 export { AsyncContext, asyncContextMode } from './async-context/async-context.ts'
 export { runAsync } from './async-awaiter/async-awaiter.ts'
-export { installTransport, toWideEvent } from './trace-transport/trace-transport.ts'
-export type { Transport, WideEvent, WideEventLog } from './trace-transport/trace-transport.types.ts'
+export { getSpanIds, installTransport, toWideEvent } from './trace-transport/trace-transport.ts'
+export type {
+  SpanIdFields,
+  Transport,
+  WideEvent,
+  WideEventLog,
+} from './trace-transport/trace-transport.types.ts'
+export { spanContext } from './trace-context/trace-context.ts'
+export type { SpanContext } from './trace-context/trace-context.types.ts'
 export { tracePlugin } from './vite-plugin-trace/vite-plugin-trace.ts'
 export type {
   LogEntry,

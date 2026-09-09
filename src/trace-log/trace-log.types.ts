@@ -97,6 +97,14 @@ export interface TraceConfig {
    * reach a transport while memory stays flat.
    */
   retain: boolean
+  /**
+   * Resolve a `SourceLocation` for every `trace()` and `log()` call.
+   *
+   * Each capture builds a stack trace, which is the most expensive part of
+   * recording a span. Turn it off where the jump-to-source links are not shown
+   * anyway, such as production, and every `source` becomes `null`.
+   */
+  captureSource: boolean
 }
 
 /** Level-bound logging methods; each records against the active span. */
